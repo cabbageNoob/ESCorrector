@@ -6,7 +6,7 @@ Date: 2020-12-04 18:31:46
 import re
 
 re_han = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&]+)", re.U)
-_re_han = re.compile("([,?!，。？！]+)", re.U)
+_re_han = re.compile("([,?!，。？！;；、]+)", re.U)
 def split_2_short_text(text, include_symbol=False):
     """
     长句切分为短句
