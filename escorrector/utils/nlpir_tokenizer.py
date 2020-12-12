@@ -41,9 +41,12 @@ if not Init(NLPIR_ICTCLAS_path.encode('UTF-8'),ENCODING.UTF8_CODE,b''):
     exit(-111111)
  
 def tokenizer4IR(sentence):
-    result = Tokenizer4IR(sentence.encode('UTF-8'), False)
-    # print('result  ',result)
-    return json.loads(result)
+    try:
+        result = Tokenizer4IR(sentence.encode('UTF-8'), False)
+        # print('result  ',result)
+        return json.loads(result)
+    except Exception as e:
+        return None   
 
 def Freq(sentence):
     result = Freqstat(sentence.encode('UTF-8'))
@@ -54,6 +57,7 @@ if __name__ == "__main__":
     print('1111111')
     p = '但却也英尺违反了和普茨迈斯特之间的保密协议。最终，普茨迈斯特出于各项商业方面考虑，仍与三一重工达成最终协议。'
     # p = '为期两天的谈判结束后，美国总统军控问题特使比林斯利在周二的新闻发布会上说'
+    p='”ACDF'
     print(tokenizer4IR(p))
 
 
