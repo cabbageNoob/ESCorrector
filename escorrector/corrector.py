@@ -12,7 +12,7 @@ from typing import List
 from escorrector.detector import Detector
 from escorrector import config
 from escorrector.utils.nlpir_tokenizer import tokenizer4IR
-from escorrector.es_build.search import filter_msg, filter_phrase_msg
+from escorrector.es_build.search import filter_msg, filter_phrase_msg, filter_msg_regexp
 from escorrector.utils.lcs_utils import LCS
 from escorrector.utils.text_utils import(
     split_2_short_text,
@@ -32,6 +32,7 @@ class Corrector(Detector):
         self.is_char_correct = is_char_correct
         self.is_word_correct = is_word_correct
         self.index_name = index_name
+        self.hanziSSCDict = self._getHanziSSCDict(hanzi_ssc_path)
         self.initialized_corrector = False
 
     def initialize_corrector(self):
@@ -57,7 +58,21 @@ class Corrector(Detector):
             # print(filter_phrase_msg('云在',index_name='corpus_generalization'))
             one_candidates={item['_source']['sentence']:item['_score'] for item in eval(filter_phrase_msg(word,index_name=self.index_name))}
             candidates = self._add_candidates(candidates=candidates, one_candidates=one_candidates)
-        return sorted(candidates.items(), key=lambda item:item[1], reverse=True)
+        return sorted(candidates.items(), key=lambda item: item[1], reverse=True)
+        
+    def get_regexp_candidates(self, msg, index_name=''):
+        '''
+        Descripttion: 利用正则查询找到候选集
+        param {*}
+        return {*}
+        '''
+        candidates={}
+        for i in range(len(msg)):
+            regexp = '.*' + msg[:i] + '.' + msg[i + 1:] + '.*'
+            one_candidates = {item['_source']['sentence']: item['_score'] for item in eval(filter_msg_regexp(regexp, index_name=self.index_name))}
+            candidates = self._add_candidates(candidates=candidates, one_candidates=one_candidates)
+        return sorted(candidates.items(), key=lambda item: item[1], reverse=True)            
+
 
     def _add_candidates(self, candidates={}, one_candidates={}):
         '''
@@ -162,7 +177,7 @@ class Corrector(Detector):
                 begin_window = begin_index - move_windows if begin_index - move_windows >= 0 else 0
                 end_window = end_index + move_windows if end_index + move_windows < len(tokens_list) else len(tokens_list)
                 seg_window = tokens_list[begin_window:end_window]
-                candidates = self.get_candidates(seg_window,index_name=self.index_name)[:10]
+                candidates = self.get_candidates(seg_window,index_name=self.index_name)
                 before_tokens = tokens_list[begin_window:begin_index]
                 after_tokens = tokens_list[end_index:end_window]
                 final_candidates = self.filter_candidates(candidates, token, before_tokens, after_tokens)
@@ -175,10 +190,14 @@ class Corrector(Detector):
 
   
 if __name__ == '__main__':
-    c = Corrector(is_char_correct=False,is_word_correct=True,index_name='corpus')
+    '''
+    no_genera_sighan_test
+    no_genera_people14_sighan_test
+    '''
+    c = Corrector(is_char_correct=False,is_word_correct=True,index_name='no_genera_people14_sighan_test')
     err_sentences = [
         # '毛泽东的扮演者贾云在时戏',
-        '如果需要在和滩铺水泥建训练基地',
+        # '如果需要在和滩铺水泥建训练基地',
         # '需经安庆市水利局睡管科审批',
         # '形成以大运河文化为混',
         # '联动为本的智慧旅游发展理念',
@@ -186,10 +205,20 @@ if __name__ == '__main__':
         # '皖水是一条大河，如果需要在和滩铺水泥建训练基地，需经安庆市水利局睡管科审批',
         # '在提升区域旅游产业能寄过程中，运用信息技术，搭建相关产业融合共享的信息平台，形成以大运河文化为混、平台为先、联动为本的智慧旅游发展理念',
         # '一本万李',
-        '遇到逆竞时'
+        # '遇到逆竞时',
+        # '坐路差不多十分钟，我们到了。',
+        # '没了声音他能怎么辨',
+        '从小，我父母的工作就很忙录。',
+        '当你一但经历和刻服了这些关卡时，就是你张开双手迎接成功的时候。',
+        '但是发生了想不道的事，也有可能一生都很辛苦，可是有一天他却过着福有的生活。',
+        '经过了一场风雨澈底的改变了他的命运，也使他的耳朵渐渐的听不到了。',
+        '但是努力的人种比不努力的人还要有成就吧！',
+        '事后它依然安然无样得坐在那儿。'
+        '反正，都己发生了，只是个糟遇罢了。'
     ]
-    for sent in err_sentences:
-        details = c.correct(sent,details=[])
-        correct_sent = get_correct_text(sent,details)
-        print("original sentence:{} => correct sentence:{} =>details:{}".format(sent, correct_sent, details))
-        
+    # for sent in err_sentences:
+    #     details = c.correct(sent,details=[])
+    #     correct_sent = get_correct_text(sent,details)
+    #     print("original sentence:{} => correct sentence:{} =>details:{}".format(sent, correct_sent, details))
+    candidates = c.get_regexp_candidates(msg='很忙录', index_name='no_genera_people14_sighan_test')
+    print(candidates)

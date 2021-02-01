@@ -6,14 +6,14 @@
 import os
 import sys, time
 sys.path.insert(0, os.getcwd())
-from escorrector.corrector import Corrector
+from escorrector.corrector_regexp import Corrector
 from escorrector import config
 from escorrector.utils.text_utils import get_correct_text
 from escorrector.utils.file_utils import writejson2file, readjson
 
 pwd_path = os.path.abspath(os.path.dirname(__file__))
-eval_result = os.path.join(pwd_path,'./data/cn/test_set/test_eval.txt')
-corrector = Corrector(is_char_correct=False, is_word_correct=True,index_name='no_genera_people14_sighan_test')
+eval_result = os.path.join(pwd_path,'./data/cn/test_set/sighan13(未加入jieba分词检错).txt')
+corrector = Corrector(is_word_error_detect=False,is_char_correct=False, is_word_correct=True,index_name='no_genera_people14_sighan_test')
 
 def eval_test(data_path, eval_result, verbose=False):
     # 错误字总数
@@ -62,7 +62,6 @@ def eval_test(data_path, eval_result, verbose=False):
                         char_correct_right += 1  # char correct正确
                 except Exception as e:
                     print(e)
-    eval_file.close()
     if verbose:
         char_detec_r = char_detec_right / (char_error_size * 1.0)
         char_detec_p = char_detec_right / (char_detec_size * 1.0)
@@ -77,7 +76,15 @@ def eval_test(data_path, eval_result, verbose=False):
         print('char_correct_F1:', str((2 * char_correct_r * char_correct_p) / (char_correct_r + char_correct_p)))
         print('spend total time:{}'.format(time.time() - t1))
         print('average time:{}'.format((time.time() - t1) / (sentence_size * 1.0)))
+
+        eval_file.write('char_detec_r:'+ str(char_detec_r)+';char_detec_p:'+ str(char_detec_p)+'\n')
+        eval_file.write('char_correct_r:'+ str(char_correct_r)+';char_correct_p:'+ str(char_correct_p)+'\n')
+        eval_file.write('char_detec_F1:'+ str((2 * char_detec_r * char_detec_p) / (char_detec_r + char_detec_p))+'\n')
+        eval_file.write('char_correct_F1:'+ str((2 * char_correct_r * char_correct_p) / (char_correct_r + char_correct_p))+'\n')
+        eval_file.write('spend total time:{}'.format(time.time() - t1)+'\n')
+        eval_file.write('average time:{}'.format((time.time() - t1) / (sentence_size * 1.0))+'\n')
+    eval_file.close()
         
 if __name__ == '__main__':
-    eval_test(data_path=config.test_path, eval_result=eval_result, verbose=True)
+    eval_test(data_path=config.sighan_2013, eval_result=eval_result, verbose=True)
     

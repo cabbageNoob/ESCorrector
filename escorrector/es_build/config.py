@@ -13,3 +13,5 @@ people2014_path = os.path.join(pwd_path, '../data/people2014.txt')
 sighan13_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2013_test_right.txt')
 sighan14_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2014_test_right.txt')
 sighan15_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2015_test_right.txt')
+
+test_right_path = os.path.join(pwd_path, '../data/cn/test_set/test_right.txt')

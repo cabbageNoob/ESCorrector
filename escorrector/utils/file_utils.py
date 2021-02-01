@@ -68,5 +68,15 @@ def readjson(filename):
     with open(filename,'rb') as outfile:
         return json.load(outfile)
 
+def get_right(filename):
+    datas = readjson(filename)
+    with open(os.path.join(pwd_path,'../data/cn/test_set/test_right.txt'),'w',encoding='utf8') as f:
+        for data in datas:
+            right_data = data['right_text']
+            f.writelines(right_data + '\n')
+        
+
 if __name__ == '__main__':
-    convert_data(sighan15_path,sighan15_right_path)
+    # convert_data(sighan15_path,sighan15_right_path)
+    get_right(os.path.join(pwd_path, '../data/cn/test_set/test.json'))
+    

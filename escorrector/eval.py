@@ -6,7 +6,7 @@
 import os
 import sys, time
 sys.path.insert(0, os.getcwd())
-from escorrector.corrector import Corrector
+from escorrector.corrector_regexp import Corrector
 from escorrector.utils.math_utils import find_all_idx
 from escorrector.utils.text_utils import get_correct_text
 """
@@ -20,7 +20,7 @@ from escorrector.utils.text_utils import get_correct_text
     人民日报语料：corpus
     人民日报语料 + sighan数据集：no_genera_people14_sighan_test
 """
-corrector = Corrector(is_char_correct=False, is_word_correct=True,index_name='no_genera_people14_sighan_test')
+corrector = Corrector(is_word_error_detect=True,is_char_correct=False, is_word_correct=True,index_name='no_genera_people14_sighan_test')
 
 pwd_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -28,7 +28,7 @@ sighan_2013 = os.path.join(pwd_path, './data/cn/sighan/sighan_2013_test.txt')
 sighan_2014 = os.path.join(pwd_path, './data/cn/sighan/sighan_2014_test.txt')
 sighan_2015 = os.path.join(pwd_path, './data/cn/sighan/sighan_2015_test.txt')
 
-sighan_2013_eval = os.path.join(pwd_path, './data/cn/sighan_eval/sighan13_word/people14sighan_eval.txt')
+eval_result = os.path.join(pwd_path,'./data/cn/test_set/sighan13_eval(加入jieba分词检错).txt')
 # sighan_2014_eval = os.path.join(pwd_path, './data/cn/sighan_eval/people14/sighan_2014_eval.txt')
 # sighan_2015_eval = os.path.join(pwd_path, './data/cn/sighan_eval/sighan_people14/sighan_2015_eval.txt')
 
@@ -174,5 +174,5 @@ def eval_bcmi_data(data_path, eval_result, verbose=False):
 if __name__ == "__main__":
     # get_gcmi_cor_test()
     # eval_bcmi_data_test()
-    eval_bcmi_data(sighan_2013, eval_result=sighan_2013_eval, verbose=True)
+    eval_bcmi_data(sighan_2013, eval_result=eval_result, verbose=True)
     # get_confusion_、dict()

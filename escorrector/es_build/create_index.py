@@ -29,6 +29,9 @@ def set_mapping(index_name=''):
                 "properties": {
                     "sentence": {
                         "type": "text"
+                    },
+                    "keyword": {
+                        "type":"keyword"
                     }
                 }
             }
@@ -44,16 +47,21 @@ def set_datas(file_path,index_name=''):
         {
             "_index": index_name,
             "_type": "doc",
+            "_id": i,
             "_source": {
-                "sentence": i,#''.join(string_generalization(i))
+                "sentence": i,  #''.join(string_generalization(i))
+                "keyword": i
             }
-        } for i in data_corpus)
+        } for i in data_corpus if len(i.encode()) < 512)
     t1 = time.time()
-    helpers.bulk(es, action)
+    try:
+        helpers.bulk(es, action)
+    except Exception as e:
+        print(e)
     print(time.time()-t1)
     return data_corpus
 
 if __name__ == '__main__':
-    set_mapping(index_name='no_genera_sighan_test')
-    set_datas(index_name='no_genera_sighan_test', file_path=config.sighan15_path)
+    set_mapping(index_name='no_genera_people14_sighan_test')
+    set_datas(index_name='no_genera_people14_sighan_test', file_path=config.test_right_path)
     # print(read_file(config.people2014_path))
