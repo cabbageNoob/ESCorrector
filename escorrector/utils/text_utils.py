@@ -97,6 +97,20 @@ def Q2B(uchar):
         return uchar
     return chr(inside_code)
 
+def is_chinese(uchar):
+    """判断一个unicode是否是汉字"""
+    if '\u4e00' <= uchar <= '\u9fa5':
+        return True
+    else:
+        return False
+
+def is_chinese_string(string):
+    """判断是否全为汉字"""
+    for c in string:
+        if not is_chinese(c):
+            return False
+    return True
+
 def stringQ2B(ustring):
     """把字符串全角转半角"""
     return "".join([Q2B(uchar) for uchar in ustring])

@@ -11,9 +11,12 @@ pwd_path = os.path.abspath(os.path.dirname(__file__))
 sighan13_path = os.path.join(pwd_path, '../data/cn/sighan/sighan_2013_test.txt')
 sighan14_path = os.path.join(pwd_path, '../data/cn/sighan/sighan_2014_test.txt')
 sighan15_path = os.path.join(pwd_path, '../data/cn/sighan/sighan_2015_test.txt')
+bcmi_path = os.path.join(pwd_path, '../data/cn/sighan/bcmi.txt')
+
 sighan13_right_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2013_test_right.txt')
 sighan14_right_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2014_test_right.txt')
 sighan15_right_path = os.path.join(pwd_path, '../data/cn/sighan_right/sighan_2015_test_right.txt')
+bcmi_right_path = os.path.join(pwd_path, '../data/cn/sighan_right/bcmi_test_right.txt')
 def get_bcmi_corpus(line, left_symbol='（（', right_symbol='））'):
     """
     转换原始文本为encoder-decoder列表
@@ -77,6 +80,6 @@ def get_right(filename):
         
 
 if __name__ == '__main__':
-    # convert_data(sighan15_path,sighan15_right_path)
-    get_right(os.path.join(pwd_path, '../data/cn/test_set/test.json'))
+    convert_data(bcmi_path,bcmi_right_path)
+    # get_right(os.path.join(pwd_path, '../data/cn/test_set/test-a.json'))
     
