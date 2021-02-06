@@ -6,6 +6,7 @@ Date: 2020-12-04 18:31:46
 import sys, os, re
 sys.path.insert(0, os.getcwd())
 from escorrector.utils.nlpir_tokenizer import tokenizer4IR
+from escorrector.utils.langconv import Converter
 import operator
 
 re_han = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&]+)", re.U)
@@ -147,6 +148,15 @@ def string_generalization(ustring):
         after_generalization.append(item['text'])
     return after_generalization
 
+def traditional2simplified(sentence):
+    """
+    将sentence中的繁体字转为简体字
+    :param sentence: 待转换的句子
+    :return: 将句子中繁体字转换为简体字之后的句子
+    """
+    sentence = Converter('zh-hans').convert(sentence)
+    return sentence
+
 def find_index_tokens(tokens, begin_idx, end_idx):
     '''
     Descripttion: 找到idx对应tokens的index
@@ -171,4 +181,5 @@ def find_index_tokens(tokens, begin_idx, end_idx):
 if __name__ == '__main__':
     # test = '《活着》是余华写的一本让人不忍卒读的书，赞誉很高'
     # split_2_short_text(test)
-    print(string_generalization('”ACDF'))
+    # print(string_generalization('”ACDF'))
+    print(traditional2simplified('刪詞'))
