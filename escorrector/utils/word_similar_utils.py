@@ -7,7 +7,8 @@ Date: 2021-02-05 15:22:04
 import sys, os
 sys.path.insert(0, os.getcwd())
 
-import Levenshtein
+import Levenshtein, codecs
+from pypinyin import pinyin, lazy_pinyin, Style
 
 from escorrector.detector import Detector
 from escorrector.utils.ssc_utils import compute_equal_rate
@@ -17,8 +18,11 @@ from escorrector.utils.text_utils import is_chinese_string, traditional2simplifi
 pwd_path = os.path.abspath(os.path.dirname(__file__))
 word_freq_path = os.path.join(pwd_path, '../data/cn/word_freq.txt')
 word_freq_new_path = os.path.join(pwd_path, '../data/cn/word_freq_new.txt')
+word_pinyin_path = os.path.join(pwd_path,'../data/cn/word_pinyin.json')
 
 word_similar_path = os.path.join(pwd_path, '../data/cn/word_similar.json')
+word_pinyin_similar_path = os.path.join(pwd_path, '../data/cn/word_pinyin_similar.json')
+word_similar_new_path = os.path.join(pwd_path, '../data/cn/word_similar_new.json')
 hanzi_ssc_path = os.path.join(pwd_path, '../data/ssc_data/hanzi_ssc_res.txt')
 
 def load_word_freq_dict(path):
@@ -82,8 +86,11 @@ def get_similar(word_freq_path, word_similar_path,threshold=0.75):
                     # if compute_equal_rate(get_word_sound_code(word_one,hanziSSCDict), get_word_sound_code(word_two,hanziSSCDict)) >= threshold:
                     if Levenshtein.distance(get_word_sound_code(word_one, hanziSSCDict), get_word_sound_code(word_two, hanziSSCDict)) <= 1:
                         word_similar[word_one].append((word_two, freq_two))
-    writejson2file(word_similar, word_similar_path)
+            writejson2file(word_similar, word_similar_path)
 
+'''
+繁体字简化，二字词语
+'''
 def process_data(word_freq_path, word_freq_new_path):
     word_freq = Detector.load_word_freq_dict(word_freq_path)
     word_freq_new = {}
@@ -93,12 +100,51 @@ def process_data(word_freq_path, word_freq_new_path):
     with open(word_freq_new_path, 'w', encoding='utf8')as f:
         for word, freq in word_freq_new.items():
             f.writelines(str(word) + ' ' + str(freq) + '\n')
+
+'''
+获取词语的拼音表示
+'''
+def get_word_pinyin(word_freq_new_path, word_pinyin_path):
+    word_freq = load_word_freq_dict(word_freq_new_path)
+    word_pinyin = {}
+    for word, freq in word_freq.items():
+        if word_pinyin.get(word) == None:
+            word_pinyin[word] = lazy_pinyin(word)
+    writejson2file(word_pinyin, word_pinyin_path)
+
+def get_pinyin_similar(word_pinyin_path,word_pinyin_similar_path):
+    word_pinyin = readjson(word_pinyin_path)
+    word_similar = {}
+    for word_one, _pinyin1 in word_pinyin.items():
+        print(word_one)
+        word_similar[word_one] = []
+        for word_two, _pinyin2 in word_pinyin.items():
+            if word_one != word_two:
+                # if compute_equal_rate(get_word_sound_code(word_one,hanziSSCDict), get_word_sound_code(word_two,hanziSSCDict)) >= threshold:
+                if Levenshtein.distance(''.join(_pinyin1), ''.join(_pinyin2)) <= 1:
+                    word_similar[word_one].append((word_two))
+        writejson2file(word_similar, word_similar_path)
+
+# 去重，去空
+def remove_dup(word_similar_path, word_similar_new_path):
+    word_similar = readjson(word_similar_path)
+    word_similar_new = {}
+    for word, similars in word_similar.items():
+        if similars != [] and word_similar_new.get(word) == None:
+            word_similar_new[word] = similars
     
+    print(len(word_similar))
+    print(len(word_similar_new))
+    writejson2file(word_similar_new,word_similar_new_path)
+            
 
 
 if __name__ == "__main__":
     # process_data(word_freq_path, word_freq_new_path)
-    get_similar(word_freq_new_path, word_similar_path)
+    # get_similar(word_freq_new_path, word_similar_path)
+    # get_word_pinyin(word_freq_new_path, word_pinyin_path)
+    get_pinyin_similar(word_pinyin_path,word_pinyin_similar_path)
+    # remove_dup(word_similar_path, word_similar_new_path)
     # hanziSSCDict = _getHanziSSCDict(hanzi_ssc_path)
     # print(Levenshtein.distance(get_word_sound_code('争取', hanziSSCDict), get_word_sound_code('正确', hanziSSCDict)))
     # print(get_word_sound_code('一一', hanziSSCDict))

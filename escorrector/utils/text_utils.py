@@ -80,6 +80,19 @@ def get_correct_text(src_text, details):
 def transformer_details(detail):
     return [detail[0], '', detail[1], detail[2], detail[3]]
 
+def _check_contain_error(maybe_err, details=[]):
+    """
+    检测错误集合(maybe_errors)是否已经包含该错误位置（maybe_err)
+    :param maybe_err: [error_word, begin_pos, end_pos, error_type]
+    :param details:[err_word, correct_word, begin_idx, end_idx, ErrorType]
+    :return:
+    """
+    for err in details:
+        if (maybe_err[1] >= err[2] and maybe_err[1] <= err[3]) or \
+            (maybe_err[2] >= err[2] and maybe_err[2] <= err[3]):
+            return True
+    return False
+
 def is_alphabet_string(string):
     """判断是否全部为英文字母"""
     for c in string:
