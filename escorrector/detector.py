@@ -1,74 +1,65 @@
-'''
-Descripttion: 
-Author: cjh (492795090@qq.com)
-Date: 2020-12-04 19:53:31
-'''
+
 import os, sys
 sys.path.insert(0, os.getcwd())
+
+from corrector_dict.detector_dict import DetectorDict
+from utils.logger import logger
+from utils.text_utils import is_alphabet_string, is_chinese_string, uniform, readjson
+import time, codecs
 from escorrector import config
-from escorrector.utils.logger import logger
-from escorrector.utils.text_utils import is_alphabet_string, uniform
-from escorrector.utils.tokenizer import Tokenizer
-import time, kenlm, codecs
 import numpy as np
 np.seterr(invalid='ignore')
 PUNCTUATION_LIST = ".。,，,、?？:：;；{}[]【】“‘’”《》/!！%……（）<>@#$~^￥%&*\"\'=+-_——「」"
 
 class ErrorType(object):
-    confusion = 'confusion'
     word = 'word'
     char = 'char'
-    redundancy = 'redundancy'   #冗余
-    miss = 'miss'               #缺失
-    word_char='word_char'       #分词后的碎片单字错误
+    word_char = 'word_char'
+    redundancy = 'redundancy'
+    similar = 'similar'
+    regex='regex'
 
 class Detector(object):
     def __init__(self, language_model_path=config.language_model_path,
-                custom_word_freq_path='',
-                word_freq_path=config.word_freq_path,
-                _person_name_path=config._person_name_path,
-                _place_name_path=config._place_name_path,
-                stopwords_path=config.stopwords_path,
-                is_char_error_detect=True,
-                is_word_error_detect=True):
+                language_word_model_path=config.language_word_model_path,
+                is_word_error_detect=True,
+                is_char_error_detect=True):
         self.name = 'detector'
         self.language_model_path = language_model_path
-        self.custom_word_freq_path = custom_word_freq_path
-        self.word_freq_path = word_freq_path
-        self._person_name_path = _person_name_path
-        self._place_name_path = _place_name_path
-        self.stopwords_path = stopwords_path
-        self.is_char_error_detect = is_char_error_detect
+        self.language_word_model_path = language_word_model_path
         self.is_word_error_detect = is_word_error_detect
+        self.is_char_error_detect = is_char_error_detect
         self.initialized_detector = False
 
     def initialize_detector(self):
         t1 = time.time()
         try:
             import kenlm
-        except ImportError:
+            self.lm = kenlm.Model(self.language_model_path)
+            logger.debug('Loaded language model: %s, spend: %s s' %
+                        (self.language_model_path, str(time.time() - t1)))
+            t1 = time.time()
+            self.lm_word = kenlm.Model(self.language_word_model_path)
+            logger.debug('Loaded language model: %s, spend: %s s' %
+                        (self.language_word_model_path, str(time.time() - t1)))
+        except Exception:
             raise ImportError('mypycorrector dependencies are not fully installed, '
                               'they are required for statistical language model.'
                               'Please use "pip install kenlm" to install it.'
                               'if you are Win, Please install kenlm in cgwin.')
+        t1 = time.time()
+        # # 同音词
+        self.word_similar = readjson(config.word_similar_path)
+        # 词、频数dict
+        self.char_freq = self.load_word_freq_dict(config.char_freq_path)
+        self.custom_word_freq = {}
 
-        self.lm = kenlm.Model(self.language_model_path)
-        logger.debug('Loaded language model: %s, spend: %s s' %
-                        (self.language_model_path, str(time.time() - t1)))
-
-         # 词、频数dict
-        self.word_freq = self.load_word_freq_dict(self.word_freq_path)
-        # 自定义切词词典
-        self.custom_word_freq = self.load_word_freq_dict(self.custom_word_freq_path)
-        self._person_names = self.load_word_freq_dict(self._person_name_path)
-        self._place_names = self.load_word_freq_dict(self._place_name_path)
-        self.stopwords = self.load_word_freq_dict(self.stopwords_path)
-        # 合并切词词典及自定义词典
-        self.custom_word_freq.update(self._person_names)
-        self.custom_word_freq.update(self._place_names)
-        self.custom_word_freq.update(self.stopwords)
-        self.word_freq.update(self.custom_word_freq)
-        self.jieba_tokenizer = Tokenizer(dict_path=self.word_freq_path, custom_word_freq_dict=self.custom_word_freq)
+        detector_dict = DetectorDict()
+        detector_dict.check_detector_dict_initialized()
+        self.jieba_tokenizer = detector_dict.tokenizer
+        self.word_freq = detector_dict.word_freq
+        logger.debug('Loaded file: %s, spend: %s s' %
+                        (config.word_freq_path, str(time.time() - t1)))
         self.initialized_detector = True
 
     def check_detector_initialized(self):
@@ -129,6 +120,24 @@ class Detector(object):
         self.check_detector_initialized()
         return self.lm.score(' '.join(words))
 
+    def ngram_word_score(self, words):
+        """
+        取n元文法得分
+        :param words: list, 以词切分
+        :return:
+        """
+        self.check_detector_initialized()
+        return self.lm_word.score(' '.join(words), bos=False, eos=False)# bos=False, eos=False
+
+    def ppl_word_score(self, words):
+        """
+        取语言模型困惑度得分，越小句子越通顺
+        :param words: list, 以词或字切分
+        :return:
+        """
+        self.check_detector_initialized()
+        return self.lm_word.perplexity(' '.join(words))
+
     @staticmethod
     def _check_contain_error(maybe_err, maybe_errors):
         """
@@ -141,8 +150,8 @@ class Detector(object):
         begin_idx = 1
         end_idx = 2
         for err in maybe_errors:
-            if maybe_err[error_word_idx] in err[error_word_idx] and maybe_err[begin_idx] >= err[begin_idx] and \
-                    maybe_err[end_idx] <= err[end_idx]:
+            if (maybe_err[begin_idx] >= err[begin_idx] and maybe_err[begin_idx] < err[end_idx]) or\
+                (maybe_err[end_idx] > err[begin_idx] and maybe_err[end_idx] <= err[end_idx]):
                 return True
         return False
 
@@ -161,7 +170,6 @@ class Detector(object):
         """
         取疑似错字的位置，通过平均绝对离差（MAD）
         :param scores: np.array
-        :param threshold: 阈值越小，得到疑似错别字越多
         :return: 全部疑似错误字的index: list
         """
         result = []
@@ -183,15 +191,17 @@ class Detector(object):
         # 取全部疑似错误字的index
         result = list(maybe_error_indices[0])
         return result
-
+    
     @staticmethod
     def is_filter_token(token):
+        """
+        是否为需过滤字词
+        :param token: 字词
+        :return: bool
+        """
         result = False
         # pass blank
         if not token.strip():
-            result = True
-        # pass punctuation
-        if token in PUNCTUATION_LIST:
             result = True
         # pass num
         if token.isdigit():
@@ -199,7 +209,51 @@ class Detector(object):
         # pass alpha
         if is_alphabet_string(token.lower()):
             result = True
+        # pass not chinese
+        if not is_chinese_string(token):
+            result = True
         return result
+
+    def detect_word(self, sentence, maybe_errors):
+        '''
+        Descripttion: 使用词模型检测句子中的疑似错词信息，包括[词、位置、错误类型]
+        param {*}
+        return {*}
+        '''
+        if not sentence.strip() or sentence in PUNCTUATION_LIST:
+            return maybe_errors
+        # 初始化
+        self.check_detector_initialized()
+        try:
+            tokens = self.jieba_tokenizer.tokenize(sentence)
+            words = [token for token, begin_idx, end_idx in tokens]
+            n = 3
+            if len(words) < n:
+                return maybe_errors
+            scores = []
+            for i in range(len(words) - n + 1):
+                word = words[i:i + n]
+                score = self.ngram_word_score(list(word))
+                scores.append(score)
+            # 移动窗口补全得分
+            scores.insert(0, scores[0])
+            scores.append(scores[-1])
+            
+            # 取疑似错字信息
+            for i in self._get_maybe_error_index(scores,threshold=1.1):
+                token = words[i]
+                # pass filter word
+                if self.is_filter_token(token):
+                    continue
+                if self.word_similar.get(token) != None:
+                    # token, begin_idx, end_idx, error_type
+                    maybe_err = [token, tokens[i][1], tokens[i][2], ErrorType.similar]
+                    self._add_maybe_error_item(maybe_err, maybe_errors)
+        except IndexError as ie:
+            logger.warn("index error, sentence:" + sentence + str(ie))
+        except Exception as e:
+            logger.warn("detect error, sentence:" + sentence + str(e))
+        return maybe_errors
 
     def detect(self, sentence):
         """
@@ -212,6 +266,8 @@ class Detector(object):
             return maybe_errors
         # 初始化
         self.check_detector_initialized()
+        # # 文本归一化
+        sentence = uniform(sentence)
         if sentence in PUNCTUATION_LIST:
             return []
         if self.is_word_error_detect:
@@ -224,10 +280,21 @@ class Detector(object):
                 if self.is_filter_token(token):
                     continue
                 # pass in dict
-                if token in self.word_freq:
-                    continue
-                maybe_err = [token, begin_idx, end_idx, 'word']
-                self._add_maybe_error_item(maybe_err, maybe_errors)
+                if token not in self.word_freq:
+                    maybe_err = [token, begin_idx, end_idx, ErrorType.word]
+                    self._add_maybe_error_item(maybe_err, maybe_errors)
+
+                else:
+                    # 多字词或词频小于10000的单字，可能出现多字少字
+                    if len(token) == 1 and token in self.char_freq and self.char_freq.get(token) < 10000:                                  
+                        maybe_err = [token, begin_idx, end_idx, ErrorType.word_char]
+                        self._add_maybe_error_item(maybe_err, maybe_errors)
+                        continue
+                    # 出现叠字，考虑是否多字
+                    if len(token) == 1 and sentence[begin_idx - 1] == token:
+                        maybe_err = [token, begin_idx, end_idx, ErrorType.redundancy]
+                        self._add_maybe_error_item(maybe_err, maybe_errors)
+            
         if self.is_char_error_detect:
             # 语言模型检测疑似错误字
             try:
@@ -252,7 +319,7 @@ class Detector(object):
                 sent_scores = list(np.average(
                     np.array(ngram_avg_scores), axis=0))
                 # 取疑似错字信息
-                for i in self._get_maybe_error_index(sent_scores):
+                for i in self._get_maybe_error_index(sent_scores,threshold=1.9):
                     token = sentence[i]
                     # pass filter word
                     if self.is_filter_token(token):
@@ -264,8 +331,9 @@ class Detector(object):
                 logger.warn("index error, sentence:" + sentence + str(ie))
             except Exception as e:
                 logger.warn("detect error, sentence:" + sentence + str(e))
+            # 最后再使用词模型进行错误检测
+            self.detect_word(sentence=sentence, maybe_errors=maybe_errors)
             maybe_errors = self._merge_detect(maybe_errors)
-        
         return sorted(maybe_errors, key=lambda k: k[1], reverse=False)
 
     def _merge_detect(self, maybe_errors):
@@ -275,10 +343,10 @@ class Detector(object):
         else:
             merge_maybe_errors = [maybe_errors[0]]
         for token, begin_idx, end_idx, err_type in maybe_errors[1:]:
-            if begin_idx == merge_maybe_errors[-1][2]:
+            if err_type not in (ErrorType.similar, ErrorType.word_char, ErrorType.redundancy) and begin_idx == merge_maybe_errors[-1][2]:
                 merge_maybe_errors[-1][0] += token
-                merge_maybe_errors[-1][2] += 1
-                merge_maybe_errors[-1][3] = 'word'
+                merge_maybe_errors[-1][2] += len(token)
+                merge_maybe_errors[-1][3] = 'merge'
             else:
                 merge_maybe_errors.append([token, begin_idx, end_idx, err_type])
         return merge_maybe_errors
@@ -289,6 +357,8 @@ if __name__ == '__main__':
     d = Detector()
     err_sentences = [
         # '昨日下午，两江影视城民国街，毛泽东的扮演者贾云在时戏。重庆晨报记者高科摄',
+        '《研学旅行服务规范》（LB/T 054-2016）、《红色旅游经典景区服务规范》（LB/T 055-2016）、《旅游电子商务企业基本信息规范》（LB/T 056-2016）、《旅游电子商务旅游产品和服务基本规范》（LB/T 057-2016）、《旅游电子商务电子合同基本信息规范》（LB/T 058-2016）、《会议服务机构经营与服务规范》（LB/T 059-2016）等6项行业标准已经国家旅游局批准，现予以公布，2017年5月1日起实施。',
+        '崔永元早年为转基因视频问题论战',
         '皖水是一条大河，如果需要在和滩铺水泥建训练基地，需经安庆市水利局睡管科审批',
         '在提升区域旅游产业能寄过程中，运用信息技术，搭建相关产业融合共享的信息平台，形成以大运河文化为混、平台为先、联动为本的智慧旅游发展理念',
         '，'
